@@ -187,10 +187,10 @@ function draw(ux, uy, p) {
             pIndex = (y * WIDTH + x);
             uIndex = pIndex * 2;
             dataIndex = pIndex * 4;
-            // imageData.data[dataIndex + 0] = div(x, y) * 128 + 128;
-            imageData.data[dataIndex + 1] = ux(x, y) * 128 + 128;
-            imageData.data[dataIndex + 2] = uy(x, y) * 128 + 128;
-            // imageData.data[dataIndex + 3] = p(x, y)  * 255;
+            imageData.data[dataIndex + 0] = (globalVarVisualisation === 1 || globalVarVisualisation === 4) ? p(x, y)  * 255         : 0;
+            imageData.data[dataIndex + 1] = (globalVarVisualisation === 3 || globalVarVisualisation === 4) ? ux(x, y) * 128 + 128   : 0;
+            imageData.data[dataIndex + 2] = (globalVarVisualisation === 3 || globalVarVisualisation === 4) ? uy(x, y) * 128 + 128   : 0;
+            imageData.data[dataIndex + 3] = (globalVarVisualisation === 2 || globalVarVisualisation === 4) ? div(x, y)* 128 + 128   : 255;
         }
     }
     ctx.putImageData(imageData, 0, 0);

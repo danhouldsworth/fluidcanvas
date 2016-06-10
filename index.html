@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html><head></head>
+<html><head>
+	<script type="text/javascript">var globalVarVisualisation;</script>
+</head>
 <body>
-		<input type="radio" id="pressure" name="button">pressure</input>
-		<input type="radio" id="divergence" name="button">divergence</input>
-		<input type="radio" id="velocity" name="button">velocity</input>
+		<input type="radio" id="pressure" name="visualisation" 	onclick="globalVarVisualisation=1;">pressure</input>
+		<input type="radio" id="divergence" name="visualisation" 	onclick="globalVarVisualisation=2;">divergence</input>
+		<input type="radio" id="velocity" name="visualisation" 	onclick="globalVarVisualisation=3;">velocity</input>
+		<input type="radio" id="all" name="visualisation" 	onclick="globalVarVisualisation=4;">all</input>
 		<br/>
 		<canvas id="canvas" style="width:1000px;height:1000px"></canvas>
 </body>
