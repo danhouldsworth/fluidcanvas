@@ -1,14 +1,26 @@
-<!DOCTYPE html>
-<html><head>
-	<script type="text/javascript">var globalVarVisualisation;</script>
+<!DOCTYPE html><html>
+<title>SimpleSkies : simpleTunnel</title>
+<head>
+    <link rel='stylesheet' type='text/css' href='style.css'>
 </head>
 <body>
-		<input type="radio" id="pressure" name="visualisation" 	onclick="globalVarVisualisation=1;">pressure</input>
-		<input type="radio" id="divergence" name="visualisation" 	onclick="globalVarVisualisation=2;">divergence</input>
-		<input type="radio" id="velocity" name="visualisation" 	onclick="globalVarVisualisation=3;">velocity</input>
-		<input type="radio" id="all" name="visualisation" 	onclick="globalVarVisualisation=4;">all</input>
-		<br/>
-		<canvas id="canvas" style="width:1000px;height:1000px"></canvas>
+    <button onclick="iterateDeltaT()">START</button>
+    <button onclick="window.cancelAnimationFrame(rafRef);">STOP</button>
+    <button onclick="replay()" id="replayButton">Empty</button>
+    <br/><br/>
+    <button onclick="updateView(1)">Pressure</button>
+    <button onclick="updateView(2)">Flux</button>
+    <button onclick="updateView(3)">Velocity</button>
+    <button onclick="updateView(4)">Composite</button>
+    <br/><br/>
+    <button onclick="contrastBoost()">Contrast x2</button>
+    <br/><br/>
+    <div style="display:inline-block;">
+        <canvas id="canvas"></canvas>
+        <div id="mouseSample">
+            <p>Mouse over to sample fluid parcel...</p>
+        </div>
+    </div>
 </body>
-<script src=fluid.js></script>
+<script type="text/javascript" src="fluid.js"></script>
 </html>

@@ -1,0 +1,47 @@
+canvas{
+    width: 150px;
+    height: 150px;
+    border          : 0px transparent;
+    box-shadow      : 0px 3px 6px rgba(0, 0, 0, 0.25);
+}
+@font-face {
+    font-family     : 'LatoLatin-Light';
+    font-style      : normal;
+    font-weight     : normal;
+    src             : url(LatoLatin-Light.woff) format('woff');
+}
+body{
+	background-color : rgba(189, 189, 189 , 1);
+    font-family     : 'LatoLatin-Light';
+    font-size   : 1em;
+    -webkit-user-select:none;
+}
+p{
+    font-size       : 1em;
+    color           : rgba(255, 255, 255, 1);
+    text-align      : center;
+}
+button {
+    color           : rgba(255, 255, 255, 1);
+    font-family     : 'LatoLatin-Light';
+    font-size       : 1.5em;
+    border-radius   : 0.2em;
+    background-color: transparent;
+    border          : 0.1em solid rgba(255,255,255,1);
+    cursor          : pointer;
+	transition      : all 1s ease;
+    -webkit-appearance: none;
+    -moz-appearance : none;
+    appearance      : none;
+
+}
+button:hover{
+    color           : rgba(34, 34, 34, 1);
+    background      : rgba(255, 255, 255, 1);
+}
+button:focus{
+	outline         : 0;
+}
+div{
+	display: inline-block;
+}
