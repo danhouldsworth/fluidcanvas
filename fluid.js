@@ -64,18 +64,25 @@ var canvas  = document.getElementById('canvas'),
         [1.0,0.0,1.0],
         [3.0,1.0,3.0]
     ],
-    gaussianWt  = gaussianMask[0][0] + gaussianMask[1][0] + gaussianMask[2][0] + gaussianMask[0][1] + gaussianMask[1][1] + gaussianMask[2][1] + gaussianMask[0][2] + gaussianMask[1][2] + gaussianMask[2][2];
+    gaussianWt  = gaussianMask[0][0] + gaussianMask[1][0] + gaussianMask[2][0] + gaussianMask[0][1] + gaussianMask[1][1] + gaussianMask[2][1] + gaussianMask[0][2] + gaussianMask[1][2] + gaussianMask[2][2],
+    mouseX = 0,
+    mouseY = 0,
+    trunc3dp = function(raw) {return (raw * 1000 | 0) / 1000;},
+    sampleField = function(e) {
+        mouseX = (e.clientX - canvas.getBoundingClientRect().left) | 0;
+        mouseY = (e.clientY - canvas.getBoundingClientRect().top ) | 0;
+        reportSample();
+    },
+    reportSample = function(){
+        mouseSample.innerHTML = "<p>At mouse pointer :</p>";
+        mouseSample.innerHTML += "<p>Pressure : " + trunc3dp(p0[arrayIndex(mouseX, mouseY)]) + " <strong>Pa</strong></p>";
+        mouseSample.innerHTML += "<p>Flux : " + trunc3dp(div[arrayIndex(mouseX, mouseY)]) + " <strong>kg/s</strong> (" + trunc3dp(div[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+        mouseSample.innerHTML += "<p>Vx : " + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+        mouseSample.innerHTML += "<p>Vy : " + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+    };
+canvas.addEventListener('mousemove', sampleField);
 
-var mouseX = 0, mouseY = 0;
-canvas.addEventListener('mousemove', function(e) {
-    mouseX = (e.clientX - canvas.getBoundingClientRect().left) | 0;
-    mouseY = (e.clientY - canvas.getBoundingClientRect().top ) | 0;
-    mouseSample.innerHTML = "<p>At mouse pointer :</p>";
-    mouseSample.innerHTML += "<p>Pressure : " + p0[arrayIndex(mouseX, mouseY)] + " <strong>Pa</strong></p>";
-    mouseSample.innerHTML += "<p>Flux : " + div[arrayIndex(mouseX, mouseY)] + " <strong>kg/s</strong> (" + div[arrayIndex(mouseX, mouseY)] + " px/calc)</p>";
-    mouseSample.innerHTML += "<p>Vx : " + u0x[arrayIndex(mouseX, mouseY)] + " <strong>m/s</strong> (" + u0x[arrayIndex(mouseX, mouseY)] + " px/calc)</p>";
-    mouseSample.innerHTML += "<p>Vy : " + u0y[arrayIndex(mouseX, mouseY)] + " <strong>m/s</strong> (" + u0y[arrayIndex(mouseX, mouseY)] + " px/calc)</p>";
-});
+
 
 gaussianMask[0][0] /= gaussianWt;
 gaussianMask[1][0] /= gaussianWt;
@@ -131,7 +138,7 @@ function physics(){
     convectionOfFluid(u0y, u1y);
     // Pressure forces and Shear forces are considered to have acted on parcel for whole of discretised time step
     // Hence we apply pressure / shear forces from t0 onto velocities at t0 to get velocities at t1
-    pressureGradientAcceleration();
+    // pressureGradientAcceleration();
     shearForceAcceleration();
 
     tunnelBoundary(u1x, u1y);
@@ -152,11 +159,11 @@ function physics(){
 }
 
 function tunnelBoundary(ux, uy) {
-    // for (var y = 0; y < SIZE; y++) {
-    //     for (var x = 0; x < SIZE; x++) {
-    //         ux[arrayIndex(x, 0)] += 0.0001; // 500 iterations to get to flow speed
-    //     }
-    // }
+    for (var y = 0; y < SIZE; y++) {
+        for (var x = 0; x < SIZE; x++) {
+            ux[arrayIndex(x, y)] += 0.0001; // 500 iterations to get to flow speed
+        }
+    }
 
     for (var x = 0; x < SIZE - 1; x++) {
         ux[arrayIndex(x, 0)] = 0;
@@ -404,6 +411,7 @@ function draw() {
     ctx.putImageData(imageData, 0, 0);
     replayFrames.push(ctx.getImageData(0, 0, SIZE, SIZE));
     document.getElementById("replayButton").innerHTML = "Replay " + replayFrames.length + " frames";
+    reportSample();
 }
 
 function updateView(view){
