@@ -60,8 +60,8 @@ var canvas  = document.getElementById("canvas"),
     reportSample = function(){
         mouseSample.innerHTML = "<p>At mouse pointer :</p>";
         mouseSample.innerHTML += "<p>Pressure delta: " + trunc3dp(p0[arrayIndex(mouseX, mouseY)]) + " <strong>Pa</strong></p>";
-        mouseSample.innerHTML += "<p>Vx : " + trunc3dp((1/modelParams.realToModel) * u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
-        mouseSample.innerHTML += "<p>Vy : " + trunc3dp((1/modelParams.realToModel) * u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+        mouseSample.innerHTML += "<p>Vx : " + trunc3dp(modelParams.modelToReal * u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+        mouseSample.innerHTML += "<p>Vy : " + trunc3dp(modelParams.modelToReal * u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
     };
 
 
@@ -73,6 +73,7 @@ modelParams.soundTunnelLengthTime       = modelParams.tunnelLength      / modelP
 modelParams.windTunnelLengthTime        = modelParams.tunnelLength      / modelParams.windSpeed;
 modelParams.deltaT                      = realWorldParams.soundTunnelLengthTime / modelParams.soundTunnelLengthTime;
 modelParams.realToModel                 = modelParams.deltaT            / parcel.size;         // seconds per ITER / meters per parcel ==> real speed (m/s) to parcel/iteration
+modelParams.modelToReal                 = 1 / modelParams.realToModel;
 
 canvas.addEventListener("mousemove", sampleField);
 canvas.addEventListener("mousedown", sampleField);
