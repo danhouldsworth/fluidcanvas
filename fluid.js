@@ -52,6 +52,7 @@ var canvas  = document.getElementById("canvas"),
     },
     trunc3dp    = function(raw) {return (raw * 1000 | 0) / 1000;},
     arrayIndex  = function(x, y){return (x + y * SIZE);},
+    speedFromVector = function(vx, vy){return Math.sqrt(vx*vx + vy*vy);},
     sampleField = function(e) {
         mouseX = (e.clientX - canvas.getBoundingClientRect().left) | 0;
         mouseY = (e.clientY - canvas.getBoundingClientRect().top ) | 0;
@@ -59,27 +60,38 @@ var canvas  = document.getElementById("canvas"),
     },
     reportSample = function(){
         mouseSample.innerHTML = "<p>At mouse pointer :</p>";
-        mouseSample.innerHTML += "<p>Pressure delta: " + trunc3dp(p0[arrayIndex(mouseX, mouseY)]) + " <strong>Pa</strong></p>";
+        mouseSample.innerHTML += "<p>Pressure delta: " + trunc3dp(1000*p0[arrayIndex(mouseX, mouseY)]) + " <strong>mPa</strong></p>";
         mouseSample.innerHTML += "<p>Vx : " + trunc3dp(modelParams.modelToReal * u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
         mouseSample.innerHTML += "<p>Vy : " + trunc3dp(modelParams.modelToReal * u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+        mouseSample.innerHTML += "<p>Mach : " + trunc3dp(speedFromVector(u0x[arrayIndex(mouseX, mouseY)], u0y[arrayIndex(mouseX, mouseY)]) / modelParams.soundSpeed) + "</p>";
     };
-
-
-realWorldParams.tunnelMach              = realWorldParams.windSpeed     / realWorldParams.soundSpeed;
-realWorldParams.soundTunnelLengthTime   = realWorldParams.tunnelLength  / realWorldParams.soundSpeed;
-realWorldParams.windTunnelLengthTime    = realWorldParams.tunnelLength  / realWorldParams.windSpeed;
-modelParams.tunnelMach                  = modelParams.windSpeed         / modelParams.soundSpeed;
-modelParams.soundTunnelLengthTime       = modelParams.tunnelLength      / modelParams.soundSpeed;
-modelParams.windTunnelLengthTime        = modelParams.tunnelLength      / modelParams.windSpeed;
-modelParams.deltaT                      = realWorldParams.soundTunnelLengthTime / modelParams.soundTunnelLengthTime;
-modelParams.realToModel                 = modelParams.deltaT            / parcel.size;         // seconds per ITER / meters per parcel ==> real speed (m/s) to parcel/iteration
-modelParams.modelToReal                 = 1 / modelParams.realToModel;
 
 canvas.addEventListener("mousemove", sampleField);
 canvas.addEventListener("mousedown", sampleField);
 
 function resizeArray(newSize){
     SIZE = newSize;
+    // ** All in SI **
+    parcel.size    = (realWorldParams.tunnelLength / SIZE);
+    parcel.area    = (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE);
+    parcel.volume  = (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE);
+
+    // *** Length / Area / Volume in Parcels *** Time in iteratinons ***
+    modelParams.soundSpeed  = jacobiIterations;
+    modelParams.tunnelLength= SIZE;
+    modelParams.deltaT      = 1 / (SIZE * realWorldParams.soundSpeed / realWorldParams.tunnelLength); // (Real world fluid) seconds per iteration ~ 15micro seconds
+    modelParams.windSpeed = jacobiIterations * realWorldParams.windSpeed / realWorldParams.soundSpeed; // Pressure moves one step per jacobiIteration
+
+    realWorldParams.tunnelMach              = realWorldParams.windSpeed     / realWorldParams.soundSpeed;
+    realWorldParams.soundTunnelLengthTime   = realWorldParams.tunnelLength  / realWorldParams.soundSpeed;
+    realWorldParams.windTunnelLengthTime    = realWorldParams.tunnelLength  / realWorldParams.windSpeed;
+    modelParams.tunnelMach                  = modelParams.windSpeed         / modelParams.soundSpeed;
+    modelParams.soundTunnelLengthTime       = modelParams.tunnelLength      / modelParams.soundSpeed;
+    modelParams.windTunnelLengthTime        = modelParams.tunnelLength      / modelParams.windSpeed;
+    modelParams.deltaT                      = realWorldParams.soundTunnelLengthTime / modelParams.soundTunnelLengthTime;
+    modelParams.realToModel                 = modelParams.deltaT            / parcel.size;         // seconds per ITER / meters per parcel ==> real speed (m/s) to parcel/iteration
+    modelParams.modelToReal                 = 1 / modelParams.realToModel;
+
     var arraySize = SIZE * SIZE;
     var newp0  = new Float32Array(arraySize);
     var newp1  = new Float32Array(arraySize);
