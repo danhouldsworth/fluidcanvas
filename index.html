@@ -7,6 +7,7 @@
     <button onclick="iterateDeltaT()">START</button>
     <button onclick="window.cancelAnimationFrame(rafRef);">STOP</button>
     <button onclick="replay()" id="replayButton">Empty</button>
+    <button onclick="resolutionChange(2)" id="resolution"></button>
     <br/><br/>
     <button onclick="updateView(1)">Pressure</button>
     <button onclick="updateView(2)">Flux</button>
@@ -24,10 +25,6 @@
     <button onclick="iterationsChange(-2)" >-</button>
     <button onclick="iterationsChange(2)">+</button>
     <button id="iterations">Jacobie iterations = 2</button>
-    <br/>
-    <button onclick="resolutionChange(0.5)" >/2</button>
-    <button onclick="resolutionChange(2)">*2</button>
-    <button id="resolution">Grid resolution = 100</button>
 
 </body>
 <script type="text/javascript" src="fluid.js"></script>

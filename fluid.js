@@ -32,22 +32,23 @@ browser       : true
 var canvas  = document.getElementById('canvas'),
     ctx     = canvas.getContext('2d'),
     mouseSample = document.getElementById('mouseSample'),
-    STARTSIZE = 32,
-    SIZE    = canvas.width = canvas.height = STARTSIZE,
-    rafRef,
-    imageData,
-    replayFrames= [],
-    replayIndex = 0,
-    visualScale = [],
-    visualOffset= [],
-    visualisationMode = 1,
-    jacobiIterations = 2,
+    visualisationMode   = 1,
+    jacobiIterations    = 2,
+    STARTSIZE           = 32,
+    SIZE = canvas.width = canvas.height = STARTSIZE,
+    rafRef, imageData, p0, p1, u0x, u0y, u1x, u1y, div,
+    replayIndex     = 0,
+    mouseX          = 0,
+    mouseY          = 0,
+    replayFrames    = [],
+    visualScale     = [],
+    visualOffset    = [],
     realWorldParams = {                         // ** All in SI
+        // density                 : 1.292,        // kg/m3                        @ STP
+        // kinematicViscosity      : 0.0000133,    // m2/s                         @ STP
+        // dynamicViscosity        : 0.0000172,    // kg/m.s OR Pa.s OR N.s/m2     @ STP
         tunnelLength            : 5,            // m
         tunnelSpeed             : 15,           // m/s
-        density                 : 1.292,        // kg/m3                        @ STP
-        kinematicViscosity      : 0.0000133,    // m2/s                         @ STP
-        dynamicViscosity        : 0.0000172,    // kg/m.s OR Pa.s OR N.s/m2     @ STP
         speedOfSound            : 330           // m/s                          @ STP
     },
     // parcel = {                              // ** All in SI **
@@ -56,13 +57,12 @@ var canvas  = document.getElementById('canvas'),
     //     volume  : (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE)
     // },
     modelParams = {                             // *** Length / Area / Volume in Parcels *** Time in iteratinons ***
-        speedOfSound: 1,
-        tunnelSpeed : 1    * realWorldParams.tunnelSpeed / realWorldParams.speedOfSound,
-        deltaT      : 1 / (SIZE * realWorldParams.speedOfSound / realWorldParams.tunnelLength) // (Real world fluid) seconds per iteration ~ 15micro seconds
+        // speedOfSound: 1,
+        // deltaT      : 1 / (SIZE * realWorldParams.speedOfSound / realWorldParams.tunnelLength), // (Real world fluid) seconds per iteration ~ 15micro seconds
+        tunnelSpeed : 1    * realWorldParams.tunnelSpeed / realWorldParams.speedOfSound
     },
-    mouseX = 0,
-    mouseY = 0,
-    trunc3dp = function(raw) {return (raw * 1000 | 0) / 1000;},
+    trunc3dp    = function(raw) {return (raw * 1000 | 0) / 1000;},
+    arrayIndex  = function(x, y){return (x + y * SIZE);},
     sampleField = function(e) {
         mouseX = (e.clientX - canvas.getBoundingClientRect().left) | 0;
         mouseY = (e.clientY - canvas.getBoundingClientRect().top ) | 0;
@@ -74,17 +74,9 @@ var canvas  = document.getElementById('canvas'),
         mouseSample.innerHTML += "<p>Vx : " + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
         mouseSample.innerHTML += "<p>Vy : " + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
     };
+
 canvas.addEventListener('mousemove', sampleField);
 canvas.addEventListener('mousedown', sampleField);
-
-var p0, p1, u0x, u0y, u1x, u1y, div;
-function arrayIndex (x, y){
-    // if (x<0)        {console.log("OUTSIDE INDEX : x=" + x);x=0;}
-    // if (x>SIZE-1)   {console.log("OUTSIDE INDEX : x=" + x);x=SIZE-1;}
-    // if (y<0)        {console.log("OUTSIDE INDEX : x=" + x);y=0;}
-    // if (y>SIZE-1)   {console.log("OUTSIDE INDEX : x=" + x);y=SIZE-1;}
-    return (x + y * SIZE);
-}
 
 function resizeArray(newSize){
     SIZE = newSize;
@@ -383,7 +375,7 @@ function iterationsChange(delta){
 }
 function resolutionChange(delta){
     resizeArray(SIZE * delta);
-    document.getElementById("resolution").innerHTML = "Resolution = " + SIZE + "x" + SIZE;
+    document.getElementById("resolution").innerHTML = "Enhance this! (" + SIZE + "x" + SIZE + ")";
 }
 function replay(){
     window.cancelAnimationFrame(rafRef);
