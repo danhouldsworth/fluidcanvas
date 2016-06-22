@@ -1,6 +1,8 @@
 /*
 simpleTunnel - Navier Stokes 2D solver on CPU / Canvas.
-Aims :
+
+1. Add bilerp to population of zoomin
+2. Add difussion / viscosity
 
 ADD function for returning shape boolean - Also think about how return surface, so can get pressure vector / friction vector into L / D / moment
 ADD steakline view mode
@@ -22,7 +24,7 @@ var canvas  = document.getElementById("canvas"),
     mouseSample = document.getElementById("mouseSample"),
     visualisationMode   = 1,
     jacobiIterations    = 2,
-    calcsPerRender      = 10,
+    calcsPerRender      = 25,
     STARTSIZE           = 32,
     SIZE = canvas.width = canvas.height = STARTSIZE,
     timerRef, imageData, p0, p1, u0x, u0y, u1x, u1y, div, x0, y0, r,
@@ -63,8 +65,10 @@ var canvas  = document.getElementById("canvas"),
         mouseSample.innerHTML += "<p>Vx : " + trunc3dp(modelParams.modelToReal * u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
         mouseSample.innerHTML += "<p>Vy : " + trunc3dp(modelParams.modelToReal * u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
         mouseSample.innerHTML += "<p>Mach : " + trunc3dp(speedFromVector(u0x[arrayIndex(mouseX, mouseY)], u0y[arrayIndex(mouseX, mouseY)]) / modelParams.soundSpeed) + "</p>";
-        mouseSample.innerHTML += "<p>Re : " + Math.floor(realWorldParams.reynolds) + "</p>";
-        mouseSample.innerHTML += "<p>Frame : " + trunc3dp(modelParams.deltaT * calcsPerRender) + "seconds. (Replay ~ " + Math.floor(1/(calcsPerRender * 60 * modelParams.deltaT)) + "x slow)</p>";
+        // mouseSample.innerHTML += "<p>Frame length : " + trunc3dp(modelParams.deltaT * calcsPerRender) + "seconds.
+        mouseSample.innerHTML += "<p>Elapsed real world : " + trunc3dp(modelParams.deltaT * calcsPerRender * replayFrames.length) + "seconds. (Replay ~ " + Math.floor(1/(calcsPerRender * 60 * modelParams.deltaT)) + "x slow)</p>";
+        mouseSample.innerHTML += "<p>Target Re : " + Math.floor(realWorldParams.reynolds) + "</p>";
+        mouseSample.innerHTML += "<p>Model Re : " + Math.floor(modelParams.reynolds) + "</p>";
     };
 
 realWorldParams.reynolds = realWorldParams.windSpeed * realWorldParams.wingChord / realWorldParams.kinematicViscosity;
@@ -77,7 +81,6 @@ canvas.addEventListener("mousedown", sampleField);
 
 function resizeArray(newSize){
     SIZE = newSize;
-
 
     // ** All in SI **
     parcel.size    = (realWorldParams.tunnelLength / SIZE);
@@ -94,11 +97,13 @@ function resizeArray(newSize){
     modelParams.deltaT                      = realWorldParams.soundTunnelLengthTime / modelParams.soundTunnelLengthTime;
     modelParams.realToModel                 = modelParams.deltaT            / parcel.size;         // seconds per ITER / meters per parcel ==> real speed (m/s) to parcel/iteration
     modelParams.modelToReal                 = 1 / modelParams.realToModel;
-
+    modelParams.kinematicViscosity          = realWorldParams.kinematicViscosity * 1000;
+    modelParams.viscosityAlpha              = 1 / (modelParams.kinematicViscosity * modelParams.deltaT);
+    modelParams.wingChord                   = modelParams.objectSizeRatio * modelParams.tunnelLength;
+    modelParams.reynolds                    = modelParams.windSpeed * modelParams.wingChord / modelParams.kinematicViscosity;
     x0  = Math.floor(SIZE / 3);
     y0  = Math.floor(SIZE / 2);
     r   = Math.floor(modelParams.objectSizeRatio * modelParams.tunnelLength / 2);
-
 
     var arraySize = SIZE * SIZE;
     var newp0  = new Float32Array(arraySize);
@@ -139,7 +144,6 @@ function resizeArray(newSize){
     div = newdiv;
 }
 
-
 function physics(){
 
     tunnelBoundary(u0x, u0y);
@@ -147,9 +151,11 @@ function physics(){
 
     advection(u0x, u1x);
     advection(u0y, u1y);
-    // diffusion();
+    // jacobi(u0x, u1x, u1x, modelParams.viscosityAlpha, 4 + modelParams.viscosityAlpha, jacobiIterations);
+    // jacobi(u0y, u1y, u1y, modelParams.viscosityAlpha, 4 + modelParams.viscosityAlpha, jacobiIterations);
     // we now have u* or w as a intermediary divergent vector field of velocities
-    computeDivergence();
+    computeDivergence(div, u0x, u0y);
+    // computeDivergence(div, u1x, u1y);
     tunnelBoundary(u1x, u1y); // Mainly for divergence and pressure implications
     objectBoundary(u1x, u1y);
     jacobi(p1, p0, div, -1, 4, jacobiIterations);
@@ -174,14 +180,10 @@ function tunnelBoundary(ux, uy) {
     // NoThru @ top and bottom sides
     for (var x = 0; x < SIZE - 1; x++) {
         // index = x + y * SIZE;
-        // ux[arrayIndex(x, 0)] = 0;
         uy[arrayIndex(x, 0)] = 0;
-        // ux[arrayIndex(x, 1)] = 0;
         uy[arrayIndex(x, 1)] = 0;
         div[arrayIndex(x, 1)] = 0;
-        // ux[arrayIndex(x, SIZE - 1)] = 0;
         uy[arrayIndex(x, SIZE - 1)] = 0;
-        // ux[arrayIndex(x, SIZE - 2)] = 0;
         uy[arrayIndex(x, SIZE - 2)] = 0;
         div[arrayIndex(x, SIZE - 2)] = 0;
     }
@@ -189,11 +191,13 @@ function tunnelBoundary(ux, uy) {
     for (var y = 2; y < SIZE - 3; y++) {
         ux[arrayIndex(0, y)] = modelParams.windSpeed;
         uy[arrayIndex(0, y)] = 0.0;
+        div[arrayIndex(0, y)] = 0.0;
         ux[arrayIndex(1, y)] = modelParams.windSpeed;
         uy[arrayIndex(1, y)] = 0.0;
         div[arrayIndex(1, y)] = 0.0;
         ux[arrayIndex(SIZE - 1, y)] = modelParams.windSpeed;
         uy[arrayIndex(SIZE - 1, y)] = 0.0;
+        div[arrayIndex(SIZE - 1, y)] = 0.0;
         ux[arrayIndex(SIZE - 2, y)] = modelParams.windSpeed;
         uy[arrayIndex(SIZE - 2, y)] = 0.0;
         div[arrayIndex(SIZE - 2, y)] = 0.0;
@@ -248,16 +252,16 @@ function advection(src, dest) {
     }
 }
 
-function computeDivergence() {
+function computeDivergence(div, ux, uy) {
     // **** ALL VELOCITITES & FLUX ARE IN PARCELs / ITERATION
     // Divergence of intermediary velocity field.
     for (var y = 1, index; y <= SIZE - 2; y++) {
         for (var x = 1; x <= SIZE - 2; x++) {
             index = x + y * SIZE;
-            div[index]  = u0x[index + 1];
-            div[index] -= u0x[index - 1];
-            div[index] += u0y[index + SIZE];
-            div[index] -= u0y[index - SIZE];
+            div[index]  = ux[index + 1];
+            div[index] -= ux[index - 1];
+            div[index] += uy[index + SIZE];
+            div[index] -= uy[index - SIZE];
             div[index] *= 0.5; // /2*deltaX
         }
     }
