@@ -24,20 +24,21 @@ var canvas  = document.getElementById("canvas"),
     jacobiIterations    = 2,
     STARTSIZE           = 32,
     SIZE = canvas.width = canvas.height = STARTSIZE,
-    rafRef, imageData, p0, p1, u0x, u0y, u1x, u1y, div,
+    timerRef, imageData, p0, p1, u0x, u0y, u1x, u1y, div,
     replayIndex     = 0,
     mouseX          = 0,
     mouseY          = 0,
     replayFrames    = [],
     visualScale     = [],
     visualOffset    = [],
-    realWorldParams = {                         // ** All in SI
-        // density                 : 1.292,        // kg/m3                        @ STP
-        // kinematicViscosity      : 0.0000133,    // m2/s                         @ STP
-        // dynamicViscosity        : 0.0000172,    // kg/m.s OR Pa.s OR N.s/m2     @ STP
-        tunnelLength            : 5,            // m
-        windSpeed               : 15,           // m/s
-        soundSpeed              : 330           // m/s                          @ STP
+    realWorldParams = {         // ** All in SI
+        // density                 : 1.292,         // kg/m3                        @ STP
+        kinematicViscosity      : 0.0000133,     // m2/s                         @ STP
+        dynamicViscosity        : 0.0000172,     // kg/m.s OR Pa.s OR N.s/m2     @ STP
+        wingChord               : 0.5,              // m
+        tunnelLength            : 10,               // m
+        windSpeed               : 15,               // m/s
+        soundSpeed              : 330               // m/s                          @ STP
     },
     parcel = {                              // ** All in SI **
         size    : (realWorldParams.tunnelLength / SIZE),
@@ -45,8 +46,9 @@ var canvas  = document.getElementById("canvas"),
         volume  : (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE)
     },
     modelParams = {                             // *** Length / Area / Volume in Parcels *** Time in iteratinons ***
-        soundSpeed  : jacobiIterations,
-        tunnelLength: SIZE,
+        soundSpeed      : jacobiIterations,
+        tunnelLength    : SIZE,
+        objectSizeRatio : realWorldParams.wingChord / realWorldParams.tunnelLength,
         // deltaT      : 1 / (SIZE * realWorldParams.soundSpeed / realWorldParams.tunnelLength), // (Real world fluid) seconds per iteration ~ 15micro seconds
         windSpeed : jacobiIterations * realWorldParams.windSpeed / realWorldParams.soundSpeed // Pressure moves one step per jacobiIteration
     },
@@ -64,8 +66,10 @@ var canvas  = document.getElementById("canvas"),
         mouseSample.innerHTML += "<p>Vx : " + trunc3dp(modelParams.modelToReal * u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
         mouseSample.innerHTML += "<p>Vy : " + trunc3dp(modelParams.modelToReal * u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
         mouseSample.innerHTML += "<p>Mach : " + trunc3dp(speedFromVector(u0x[arrayIndex(mouseX, mouseY)], u0y[arrayIndex(mouseX, mouseY)]) / modelParams.soundSpeed) + "</p>";
+        mouseSample.innerHTML += "<p>Re : " + Math.floor(realWorldParams.reynolds) + "</p>";
     };
 
+realWorldParams.reynolds = realWorldParams.windSpeed * realWorldParams.wingChord / realWorldParams.kinematicViscosity;
 canvas.addEventListener("mousemove", sampleField);
 canvas.addEventListener("mousedown", sampleField);
 
@@ -202,7 +206,7 @@ function objectBoundary(ux, uy){
 
     var x0  = Math.floor(SIZE / 3),
         y0  = Math.floor(SIZE / 2),
-        r   = Math.floor(SIZE / 40),
+        r   = Math.floor(modelParams.objectSizeRatio * modelParams.tunnelLength / 2),
         index;
     // -- CIRCLE
     for (var y = y0 - r; y < y0 + r; y++) {
@@ -365,6 +369,9 @@ function updateView(view){
         }
         visualOffset[field] = - minField * visualScale[field];
     }
+    // visualScale[1] *= 2;
+    visualScale[2] *= 32;
+    // visualScale[3] *= 1;
 }
 function contrastBoost(){
     if (visualisationMode === 4) {visualScale[2] *= 2;} // Dial up flux if rendering composite of all
@@ -373,7 +380,7 @@ function contrastBoost(){
 function iterateDeltaT(){
     physics();physics();physics();physics();physics();physics();physics();physics();physics();physics(); // 10 CalcsPerRender
     draw(); // This is more crude than bramble double buffer, as hard coding 0th frame
-    rafRef = window.requestAnimationFrame(iterateDeltaT);
+    timerRef = setTimeout(iterateDeltaT, 20);
 }
 function iterationsChange(delta){
     jacobiIterations += delta;
@@ -384,14 +391,14 @@ function resolutionChange(delta){
     document.getElementById("resolution").innerHTML = "Enhance this! (" + SIZE + "x" + SIZE + ")";
 }
 function replay(){
-    window.cancelAnimationFrame(rafRef);
+    clearTimeout(timerRef);
     if (replayIndex < replayFrames.length - 1){
         ctx.putImageData(replayFrames[replayIndex++], 0, 0);
         document.getElementById("replayButton").innerHTML = replayIndex + " of " + replayFrames.length;
-        rafRef = window.requestAnimationFrame(replay);
+        window.requestAnimationFrame(replay);
     } else {
         replayIndex = 0;
-        rafRef = window.requestAnimationFrame(iterateDeltaT);
+        timerRef = setTimeout(iterateDeltaT, 20);
     }
 }
 
