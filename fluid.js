@@ -1,21 +1,11 @@
 /*
 simpleTunnel - Navier Stokes 2D solver on CPU / Canvas.
 Aims :
-6. Is static pressure, dynamic pressure and temperature clear? - Not sure the physical concept of dynamic pressure is that helpful in the real world anyway. Temperature is linked to divergence and we need to think more on it, see 5 above.
-7. What if boundary conditions had through put of flow? Wrapped / tunnel etc. - Ha! Have done this do do objects. And now I'm clear on iterative approach per modelParams.deltaT we don't need boundary conditions.
-8. How to have object boundaries within - change the indexing from full raster, to exclusion of object and boundary? - Done. No slip, no thru-flow. Think about div / pressure calc. Think about compuationally effective method of skipping this area.
-9. Simply coding to my style. Then optimise so still understand physics and parameters. - Done
-10. Is viscosity and shear force clear? - Wasn't here!! Need to add carefully, thinking about sheer forces and point 5 above.
-** How can we record / take measurements along the wing? - Easy, trace the path of object, taking pressure readings.
 
 ADD function for returning shape boolean - Also think about how return surface, so can get pressure vector / friction vector into L / D / moment
-FIX boundary conditions calc for div & pressure at boundary. Eg. Why to we get reflection back of pressure from tunnel exit? Why does pressure get through thin object?
 ADD steakline view mode
 ADD timeline view mode
 Add vector arrow view mode
-
-Add known shapes
-ADD airfoil shape
 
 Output - Lift / Drag / Moment of object
 */
@@ -45,19 +35,20 @@ var canvas  = document.getElementById("canvas"),
         // density                 : 1.292,        // kg/m3                        @ STP
         // kinematicViscosity      : 0.0000133,    // m2/s                         @ STP
         // dynamicViscosity        : 0.0000172,    // kg/m.s OR Pa.s OR N.s/m2     @ STP
-        // tunnelLength            : 5,            // m
-        tunnelSpeed             : 15,           // m/s
-        speedOfSound            : 330           // m/s                          @ STP
+        tunnelLength            : 5,            // m
+        windSpeed               : 15,           // m/s
+        soundSpeed              : 330           // m/s                          @ STP
     },
-    // parcel = {                              // ** All in SI **
-    //     size    : (realWorldParams.tunnelLength / SIZE),
-    //     area    : (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE),
-    //     volume  : (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE)
-    // },
+    parcel = {                              // ** All in SI **
+        size    : (realWorldParams.tunnelLength / SIZE),
+        area    : (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE),
+        volume  : (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE)
+    },
     modelParams = {                             // *** Length / Area / Volume in Parcels *** Time in iteratinons ***
-        // speedOfSound: 1,
-        // deltaT      : 1 / (SIZE * realWorldParams.speedOfSound / realWorldParams.tunnelLength), // (Real world fluid) seconds per iteration ~ 15micro seconds
-        tunnelSpeed : jacobiIterations * realWorldParams.tunnelSpeed / realWorldParams.speedOfSound // Pressure moves one step per jacobiIteration
+        soundSpeed  : jacobiIterations,
+        tunnelLength: SIZE,
+        // deltaT      : 1 / (SIZE * realWorldParams.soundSpeed / realWorldParams.tunnelLength), // (Real world fluid) seconds per iteration ~ 15micro seconds
+        windSpeed : jacobiIterations * realWorldParams.windSpeed / realWorldParams.soundSpeed // Pressure moves one step per jacobiIteration
     },
     trunc3dp    = function(raw) {return (raw * 1000 | 0) / 1000;},
     arrayIndex  = function(x, y){return (x + y * SIZE);},
@@ -69,9 +60,19 @@ var canvas  = document.getElementById("canvas"),
     reportSample = function(){
         mouseSample.innerHTML = "<p>At mouse pointer :</p>";
         mouseSample.innerHTML += "<p>Pressure delta: " + trunc3dp(p0[arrayIndex(mouseX, mouseY)]) + " <strong>Pa</strong></p>";
-        mouseSample.innerHTML += "<p>Vx : " + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
-        mouseSample.innerHTML += "<p>Vy : " + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+        mouseSample.innerHTML += "<p>Vx : " + trunc3dp((1/modelParams.realToModel) * u0x[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0x[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
+        mouseSample.innerHTML += "<p>Vy : " + trunc3dp((1/modelParams.realToModel) * u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
     };
+
+
+realWorldParams.tunnelMach              = realWorldParams.windSpeed     / realWorldParams.soundSpeed;
+realWorldParams.soundTunnelLengthTime   = realWorldParams.tunnelLength  / realWorldParams.soundSpeed;
+realWorldParams.windTunnelLengthTime    = realWorldParams.tunnelLength  / realWorldParams.windSpeed;
+modelParams.tunnelMach                  = modelParams.windSpeed         / modelParams.soundSpeed;
+modelParams.soundTunnelLengthTime       = modelParams.tunnelLength      / modelParams.soundSpeed;
+modelParams.windTunnelLengthTime        = modelParams.tunnelLength      / modelParams.windSpeed;
+modelParams.deltaT                      = realWorldParams.soundTunnelLengthTime / modelParams.soundTunnelLengthTime;
+modelParams.realToModel                 = modelParams.deltaT            / parcel.size;         // seconds per ITER / meters per parcel ==> real speed (m/s) to parcel/iteration
 
 canvas.addEventListener("mousemove", sampleField);
 canvas.addEventListener("mousedown", sampleField);
@@ -94,7 +95,7 @@ function resizeArray(newSize){
     if (newSize === STARTSIZE) {
         for(var i = 0; i < arraySize; i++) {
             newp1[i]   = newp0[i]     = 0; // Define pressure as delta to ambient
-            newu1x[i]  = newu0x[i]    = modelParams.tunnelSpeed;
+            newu1x[i]  = newu0x[i]    = modelParams.windSpeed;
             newu1y[i]  = newu0y[i]    = 0;
         }
     } else {
@@ -171,14 +172,14 @@ function tunnelBoundary(ux, uy) {
     }
     // NoSlip / Laminer flow speed at left / right edges
     for (var y = 2; y < SIZE - 3; y++) {
-        ux[arrayIndex(0, y)] = modelParams.tunnelSpeed;
+        ux[arrayIndex(0, y)] = modelParams.windSpeed;
         uy[arrayIndex(0, y)] = 0.0;
-        ux[arrayIndex(1, y)] = modelParams.tunnelSpeed;
+        ux[arrayIndex(1, y)] = modelParams.windSpeed;
         uy[arrayIndex(1, y)] = 0.0;
         div[arrayIndex(1, y)] = 0.0;
-        ux[arrayIndex(SIZE - 1, y)] = modelParams.tunnelSpeed;
+        ux[arrayIndex(SIZE - 1, y)] = modelParams.windSpeed;
         uy[arrayIndex(SIZE - 1, y)] = 0.0;
-        ux[arrayIndex(SIZE - 2, y)] = modelParams.tunnelSpeed;
+        ux[arrayIndex(SIZE - 2, y)] = modelParams.windSpeed;
         uy[arrayIndex(SIZE - 2, y)] = 0.0;
         div[arrayIndex(SIZE - 2, y)] = 0.0;
     }

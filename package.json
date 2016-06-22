@@ -1,0 +1,13 @@
+{
+  "name" : "simpleTunnel",
+  "version"                       : "1.0.0",
+  "author" : "Dan Houldsworth <dan@kew.io>",
+  "keywords" : [ ],
+  "dependencies" : {
+  },
+  "devDependencies": {
+    "jshint"    : "=2.9.2"
+  },
+  "license"     : "Private",
+  "private"     : true
+}
