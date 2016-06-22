@@ -22,9 +22,10 @@ var canvas  = document.getElementById("canvas"),
     mouseSample = document.getElementById("mouseSample"),
     visualisationMode   = 1,
     jacobiIterations    = 2,
+    calcsPerRender      = 10,
     STARTSIZE           = 32,
     SIZE = canvas.width = canvas.height = STARTSIZE,
-    timerRef, imageData, p0, p1, u0x, u0y, u1x, u1y, div,
+    timerRef, imageData, p0, p1, u0x, u0y, u1x, u1y, div, x0, y0, r,
     replayIndex     = 0,
     mouseX          = 0,
     mouseY          = 0,
@@ -46,11 +47,7 @@ var canvas  = document.getElementById("canvas"),
         volume  : (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE)
     },
     modelParams = {                             // *** Length / Area / Volume in Parcels *** Time in iteratinons ***
-        soundSpeed      : jacobiIterations,
-        tunnelLength    : SIZE,
-        objectSizeRatio : realWorldParams.wingChord / realWorldParams.tunnelLength,
-        // deltaT      : 1 / (SIZE * realWorldParams.soundSpeed / realWorldParams.tunnelLength), // (Real world fluid) seconds per iteration ~ 15micro seconds
-        windSpeed : jacobiIterations * realWorldParams.windSpeed / realWorldParams.soundSpeed // Pressure moves one step per jacobiIteration
+        objectSizeRatio : realWorldParams.wingChord / realWorldParams.tunnelLength
     },
     trunc3dp    = function(raw) {return (raw * 1000 | 0) / 1000;},
     arrayIndex  = function(x, y){return (x + y * SIZE);},
@@ -67,34 +64,41 @@ var canvas  = document.getElementById("canvas"),
         mouseSample.innerHTML += "<p>Vy : " + trunc3dp(modelParams.modelToReal * u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
         mouseSample.innerHTML += "<p>Mach : " + trunc3dp(speedFromVector(u0x[arrayIndex(mouseX, mouseY)], u0y[arrayIndex(mouseX, mouseY)]) / modelParams.soundSpeed) + "</p>";
         mouseSample.innerHTML += "<p>Re : " + Math.floor(realWorldParams.reynolds) + "</p>";
+        mouseSample.innerHTML += "<p>Frame : " + trunc3dp(modelParams.deltaT * calcsPerRender) + "seconds. (Replay ~ " + Math.floor(1/(calcsPerRender * 60 * modelParams.deltaT)) + "x slow)</p>";
     };
 
 realWorldParams.reynolds = realWorldParams.windSpeed * realWorldParams.wingChord / realWorldParams.kinematicViscosity;
+realWorldParams.tunnelMach              = realWorldParams.windSpeed     / realWorldParams.soundSpeed;
+realWorldParams.soundTunnelLengthTime   = realWorldParams.tunnelLength  / realWorldParams.soundSpeed;
+realWorldParams.windTunnelLengthTime    = realWorldParams.tunnelLength  / realWorldParams.windSpeed;
+
 canvas.addEventListener("mousemove", sampleField);
 canvas.addEventListener("mousedown", sampleField);
 
 function resizeArray(newSize){
     SIZE = newSize;
+
+
     // ** All in SI **
     parcel.size    = (realWorldParams.tunnelLength / SIZE);
     parcel.area    = (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE);
     parcel.volume  = (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE) * (realWorldParams.tunnelLength / SIZE);
 
     // *** Length / Area / Volume in Parcels *** Time in iteratinons ***
-    modelParams.soundSpeed  = jacobiIterations;
-    modelParams.tunnelLength= SIZE;
-    modelParams.deltaT      = 1 / (SIZE * realWorldParams.soundSpeed / realWorldParams.tunnelLength); // (Real world fluid) seconds per iteration ~ 15micro seconds
-    modelParams.windSpeed = jacobiIterations * realWorldParams.windSpeed / realWorldParams.soundSpeed; // Pressure moves one step per jacobiIteration
-
-    realWorldParams.tunnelMach              = realWorldParams.windSpeed     / realWorldParams.soundSpeed;
-    realWorldParams.soundTunnelLengthTime   = realWorldParams.tunnelLength  / realWorldParams.soundSpeed;
-    realWorldParams.windTunnelLengthTime    = realWorldParams.tunnelLength  / realWorldParams.windSpeed;
+    modelParams.soundSpeed                  = 0.5; // Expected : jacobiIterations BUT EMPIRICAL MEASUREMENT 100frames @10calcs per frame to echo wall and back from centre on 512x512
+    modelParams.tunnelLength                = SIZE;
+    modelParams.windSpeed                   = modelParams.soundSpeed * realWorldParams.tunnelMach;
     modelParams.tunnelMach                  = modelParams.windSpeed         / modelParams.soundSpeed;
     modelParams.soundTunnelLengthTime       = modelParams.tunnelLength      / modelParams.soundSpeed;
     modelParams.windTunnelLengthTime        = modelParams.tunnelLength      / modelParams.windSpeed;
     modelParams.deltaT                      = realWorldParams.soundTunnelLengthTime / modelParams.soundTunnelLengthTime;
     modelParams.realToModel                 = modelParams.deltaT            / parcel.size;         // seconds per ITER / meters per parcel ==> real speed (m/s) to parcel/iteration
     modelParams.modelToReal                 = 1 / modelParams.realToModel;
+
+    x0  = Math.floor(SIZE / 3);
+    y0  = Math.floor(SIZE / 2);
+    r   = Math.floor(modelParams.objectSizeRatio * modelParams.tunnelLength / 2);
+
 
     var arraySize = SIZE * SIZE;
     var newp0  = new Float32Array(arraySize);
@@ -167,23 +171,17 @@ function physics(){
 }
 
 function tunnelBoundary(ux, uy) {
-    // for (var y = 0; y < SIZE; y++) {
-    //     for (var x = 0; x < SIZE; x++) {
-    //         ux[arrayIndex(x, y)] += 0.0001; // 500 iterations to get to flow speed
-    //     }
-    // }
-
-    // NoSlip / NoThru @ top and bottom sides
+    // NoThru @ top and bottom sides
     for (var x = 0; x < SIZE - 1; x++) {
         // index = x + y * SIZE;
-        ux[arrayIndex(x, 0)] = 0;
+        // ux[arrayIndex(x, 0)] = 0;
         uy[arrayIndex(x, 0)] = 0;
-        ux[arrayIndex(x, 1)] = 0;
+        // ux[arrayIndex(x, 1)] = 0;
         uy[arrayIndex(x, 1)] = 0;
         div[arrayIndex(x, 1)] = 0;
-        ux[arrayIndex(x, SIZE - 1)] = 0;
+        // ux[arrayIndex(x, SIZE - 1)] = 0;
         uy[arrayIndex(x, SIZE - 1)] = 0;
-        ux[arrayIndex(x, SIZE - 2)] = 0;
+        // ux[arrayIndex(x, SIZE - 2)] = 0;
         uy[arrayIndex(x, SIZE - 2)] = 0;
         div[arrayIndex(x, SIZE - 2)] = 0;
     }
@@ -203,16 +201,11 @@ function tunnelBoundary(ux, uy) {
 }
 
 function objectBoundary(ux, uy){
-
-    var x0  = Math.floor(SIZE / 3),
-        y0  = Math.floor(SIZE / 2),
-        r   = Math.floor(modelParams.objectSizeRatio * modelParams.tunnelLength / 2),
-        index;
-    // -- CIRCLE
+    var index;
     for (var y = y0 - r; y < y0 + r; y++) {
         for (var x = x0 - r; x < x0 + r; x++) {
             index = x + y * SIZE;
-            if ((x-x0)*(x-x0)+(y-y0)*(y-y0) < (r*r) ) {
+            if (inBluffSphere(x,y, x0, y0, r)) {
                 ux[index] = 0;
                 uy[index] = 0;
                 div[index] = 0;
@@ -221,7 +214,9 @@ function objectBoundary(ux, uy){
     }
 
 }
-
+function inBluffSphere(x, y, x0, y0, r){
+    if ((x-x0)*(x-x0)+(y-y0)*(y-y0) < (r*r) ) {return true;}
+}
 function advection(src, dest) {
 
     // **** ALL VELOCITITES & FLUX ARE IN PARCELs / ITERATION
@@ -332,6 +327,7 @@ function draw() {
             imageData.data[imgIndex + 2] = (visualisationMode === 3 || visualisationMode === 4) ? u0y[dataIndex]  * visualScale[3] + visualOffset[3] : 0;
             imageData.data[imgIndex + 3] = (visualisationMode === 2 || visualisationMode === 4) ? div[dataIndex]  * visualScale[2] + visualOffset[2] : 255;
             // Add time lines / streaklines
+            if (inBluffSphere(x, y, x0, y0, r)) {imageData.data[imgIndex + 0] = imageData.data[imgIndex + 1] = imageData.data[imgIndex + 2] = imageData.data[imgIndex + 3] = 255;}
         }
     }
     ctx.putImageData(imageData, 0, 0);
@@ -378,7 +374,7 @@ function contrastBoost(){
     else {visualScale[visualisationMode] *= 2;}
 }
 function iterateDeltaT(){
-    physics();physics();physics();physics();physics();physics();physics();physics();physics();physics(); // 10 CalcsPerRender
+    for (var calcStep = 0; calcStep < calcsPerRender; calcStep++){physics();}
     draw(); // This is more crude than bramble double buffer, as hard coding 0th frame
     timerRef = setTimeout(iterateDeltaT, 20);
 }
