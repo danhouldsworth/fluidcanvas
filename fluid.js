@@ -1,11 +1,6 @@
 /*
 simpleTunnel - Navier Stokes 2D solver on CPU / Canvas.
 Aims :
-1. Validate my understanding of this kind of FEA method - Done. I'm going for unbounded iterative approach on cartesian grid. They go for convergent solver on mesh grid.
-2. Verify that this approach to NS gives real seeming solutions - YEP!! Vortex streets and pressure drag WoopWoop!!
-3. Read the paper - and verify that pixelated cartesian grid seems fine vs complex custom mesh (that's what was holding me back from FEM before) - See 1 above. It's a lot simpler than they all made out.
-4. Is square parcels okay v gaussian mask? - Yes, but now I understand iterative vs solver, I'm going to do one single pressure calc per iteration, and so a gaussian mask will be more appropriate.
-5. What are the density, Mach implications? - See 4, we need to start mapping to Mach, density, viscosity. And so have them consistent in our calcs independent of grid size.
 6. Is static pressure, dynamic pressure and temperature clear? - Not sure the physical concept of dynamic pressure is that helpful in the real world anyway. Temperature is linked to divergence and we need to think more on it, see 5 above.
 7. What if boundary conditions had through put of flow? Wrapped / tunnel etc. - Ha! Have done this do do objects. And now I'm clear on iterative approach per modelParams.deltaT we don't need boundary conditions.
 8. How to have object boundaries within - change the indexing from full raster, to exclusion of object and boundary? - Done. No slip, no thru-flow. Think about div / pressure calc. Think about compuationally effective method of skipping this area.
@@ -23,15 +18,18 @@ Add known shapes
 ADD airfoil shape
 
 Output - Lift / Drag / Moment of object
-
-*/
-"use strict";/* jshint
-browser       : true
 */
 
-var canvas  = document.getElementById('canvas'),
-    ctx     = canvas.getContext('2d'),
-    mouseSample = document.getElementById('mouseSample'),
+"use strict";
+/* global replay */
+/* jshint
+browser       : true,
+bitwise : false
+*/
+
+var canvas  = document.getElementById("canvas"),
+    ctx     = canvas.getContext("2d"),
+    mouseSample = document.getElementById("mouseSample"),
     visualisationMode   = 1,
     jacobiIterations    = 2,
     STARTSIZE           = 32,
@@ -47,7 +45,7 @@ var canvas  = document.getElementById('canvas'),
         // density                 : 1.292,        // kg/m3                        @ STP
         // kinematicViscosity      : 0.0000133,    // m2/s                         @ STP
         // dynamicViscosity        : 0.0000172,    // kg/m.s OR Pa.s OR N.s/m2     @ STP
-        tunnelLength            : 5,            // m
+        // tunnelLength            : 5,            // m
         tunnelSpeed             : 15,           // m/s
         speedOfSound            : 330           // m/s                          @ STP
     },
@@ -59,7 +57,7 @@ var canvas  = document.getElementById('canvas'),
     modelParams = {                             // *** Length / Area / Volume in Parcels *** Time in iteratinons ***
         // speedOfSound: 1,
         // deltaT      : 1 / (SIZE * realWorldParams.speedOfSound / realWorldParams.tunnelLength), // (Real world fluid) seconds per iteration ~ 15micro seconds
-        tunnelSpeed : 1    * realWorldParams.tunnelSpeed / realWorldParams.speedOfSound
+        tunnelSpeed : jacobiIterations * realWorldParams.tunnelSpeed / realWorldParams.speedOfSound // Pressure moves one step per jacobiIteration
     },
     trunc3dp    = function(raw) {return (raw * 1000 | 0) / 1000;},
     arrayIndex  = function(x, y){return (x + y * SIZE);},
@@ -75,8 +73,8 @@ var canvas  = document.getElementById('canvas'),
         mouseSample.innerHTML += "<p>Vy : " + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " <strong>m/s</strong> (" + trunc3dp(u0y[arrayIndex(mouseX, mouseY)]) + " px/calc)</p>";
     };
 
-canvas.addEventListener('mousemove', sampleField);
-canvas.addEventListener('mousedown', sampleField);
+canvas.addEventListener("mousemove", sampleField);
+canvas.addEventListener("mousedown", sampleField);
 
 function resizeArray(newSize){
     SIZE = newSize;
@@ -96,7 +94,7 @@ function resizeArray(newSize){
     if (newSize === STARTSIZE) {
         for(var i = 0; i < arraySize; i++) {
             newp1[i]   = newp0[i]     = 0; // Define pressure as delta to ambient
-            newu1x[i]  = newu0x[i]    = modelParams.tunnelSpeed;//0;
+            newu1x[i]  = newu0x[i]    = modelParams.tunnelSpeed;
             newu1y[i]  = newu0y[i]    = 0;
         }
     } else {
@@ -117,17 +115,14 @@ function resizeArray(newSize){
     u1x = newu1x;
     u1y = newu1y;
     div = newdiv;
-    // --
 }
-
 
 
 function physics(){
 
-    // State at t = t0
     tunnelBoundary(u0x, u0y);
     objectBoundary(u0x, u0y);
-    // - these constrained fields will be used for render / and t1 calcs
+
     advection(u0x, u1x);
     advection(u0y, u1y);
     // diffusion();
@@ -216,10 +211,7 @@ function advection(src, dest) {
     function bilerp(x, y) {
         // x,y as fractional pixel index
         // Linear interpolation between 2 values a-->b, parametised by 0<c<1
-        var lerp = function (a, b, c) {
-            if (c<0 || c>1) throw c;
-            return a * (1 - c) + b * c;
-        };
+        var lerp = function (a, b, c) {return a * (1 - c) + b * c;};
         var x0 = Math.floor(x),
             y0 = Math.floor(y),
             xm = x - x0,
@@ -361,8 +353,8 @@ function updateView(view){
     }
 }
 function contrastBoost(){
-    if (visualisationMode === 4) visualScale[2] *= 2; // Dial up flux if rendering composite of all
-    else visualScale[visualisationMode] *= 2;
+    if (visualisationMode === 4) {visualScale[2] *= 2;} // Dial up flux if rendering composite of all
+    else {visualScale[visualisationMode] *= 2;}
 }
 function iterateDeltaT(){
     physics();physics();physics();physics();physics();physics();physics();physics();physics();physics(); // 10 CalcsPerRender
